@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>堅守協定：盟約2nd オペレータ検索&パーティ編成</title>
+<style>
+  :root {
+    --bg: #14161c;
+    --panel: #1d2028;
+    --panel-alt: #262a35;
+    --border: #363b4a;
+    --accent: #5b8def;
+    --accent-soft: rgba(91, 141, 239, 0.18);
+    --text: #e8eaf0;
+    --text-dim: #9aa0b0;
+    --star6: #ffb02e;
+    --star5: #ffd76e;
+    --star4: #d6b4ff;
+    --star3: #8ec9ff;
+    --star2: #8bd17c;
+    --star1: #9aa0b0;
+    --danger: #ff6b6b;
+    --ok: #5be08a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: 60px;
+  }
+  header {
+    padding: 20px 24px 14px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #1a1d25, #14161c);
+  }
+  header h1 { margin: 0 0 4px; font-size: 19px; }
+  header p { margin: 0; font-size: 12px; color: var(--text-dim); }
+
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px 16px;
+  }
+
+  /* 2カラムレイアウト。狭い画面では縦積みになる */
+  .layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: flex-start;
+  }
+  .col {
+    flex: 1 1 460px;
+    min-width: 0;
+  }
+
+  /* 左カラム(盟約カウント+PT編成)は2カラム表示時に上部固定。画面高さを超える分は内部スクロールで下端まで見られる */
+  .col-pinned {
+    position: sticky;
+    top: 12px;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    z-index: 1;
+  }
+
+  /* スマホ幅(縦積み)では sticky を解除し、代わりに盟約カウントのみ画面最上部に固定表示 */
+  .mobile-pinned-summary {
+    display: none;
+  }
+  @media (max-width: 980px) {
+    .col-pinned { position: static; }
+
+    .mobile-pinned-summary {
+      display: block;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 12px;
+      margin: 0 -1px;
+    }
+    .mobile-pinned-summary .meiyaku-summary { gap: 6px; }
+    .mobile-pinned-summary .meiyaku-badge { padding: 4px 8px 4px 4px; }
+    .mobile-pinned-summary .meiyaku-badge-icon { width: 22px; height: 22px; font-size: 11px; }
+    .mobile-pinned-summary .meiyaku-badge-name { font-size: 11px; }
+    .mobile-pinned-summary .meiyaku-badge-frac { font-size: 12px; }
+    /* スマホでは元の盟約カウントsectionは非表示にし、上部固定バーのみ使う */
+    .col-pinned > section.meiyaku-section-original { display: none; }
+  }
+
+  /* 検索セクションの折りたたみ */
+  .collapsible-header {
+    cursor: pointer;
+    user-select: none;
+    justify-content: space-between !important;
+  }
+  .collapsible-header .collapse-arrow {
+    font-size: 11px;
+    color: var(--text-dim);
+    transition: transform 0.15s;
+  }
+  .collapsible-header.collapsed .collapse-arrow { transform: rotate(-90deg); }
+  .collapsible-body {
+    overflow: hidden;
+  }
+  .collapsible-body.collapsed { display: none; }
+
+  section {
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  section h2 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  select, input[type="text"], input[type="url"] {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  input[type="text"] { flex: 1; min-width: 140px; }
+
+  .mode-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .mode-toggle button {
+    background: var(--panel);
+    color: var(--text-dim);
+    border: none;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .mode-toggle button.active { background: var(--accent); color: #fff; }
+
+  .chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    cursor: pointer;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .chip.selected { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .chip-type-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .type-core { background: var(--star6); }
+  .type-extra { background: var(--star3); }
+  .type-legend {
+    display: flex;
+    gap: 14px;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    align-items: center;
+  }
+  .type-legend span { display: inline-flex; align-items: center; gap: 5px; }
+
+  .sub-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin: 14px 0 6px;
+  }
+
+  /* キャラアイコングリッド(検索結果 & パーティ枠共通) */
+  .icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+  }
+  .op-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: grab;
+    padding: 6px 4px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: var(--panel);
+    position: relative;
+    user-select: none;
+    touch-action: none;
+  }
+  .op-card:active { cursor: grabbing; }
+  .op-card.dragging { opacity: 0.4; }
+  .op-card.in-party { border-color: var(--ok); }
+  .op-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+    background: var(--panel-alt);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 20px;
+    overflow: hidden;
+    border: 2px solid var(--border);
+    pointer-events: none;
+  }
+  .op-icon img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+  .op-icon.r6 { border-color: var(--star6); }
+  .op-icon.r5 { border-color: var(--star5); }
+  .op-icon.r4 { border-color: var(--star4); }
+  .op-icon.r3 { border-color: var(--star3); }
+  .op-icon.r2 { border-color: var(--star2); }
+  .op-icon.r1 { border-color: var(--star1); }
+  .op-name {
+    font-size: 11px;
+    text-align: center;
+    line-height: 1.2;
+    max-width: 74px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .op-tap-add {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .op-tap-add.remove { background: var(--danger); }
+  .op-tap-add:disabled { background: var(--border); cursor: not-allowed; }
+
+  .empty-state {
+    text-align: center;
+    padding: 30px 12px;
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.8;
+    grid-column: 1 / -1;
+  }
+
+  /* パーティドロップゾーン */
+  #partyDropZone {
+    min-height: 100px;
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  #partyDropZone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .party-count-label {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-dim);
+    margin-left: 6px;
+  }
+  .party-count-label b { color: var(--text); }
+
+  .meiyaku-summary {
+    margin-top: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .meiyaku-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px 6px 6px;
+    border-radius: 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    transition: background 0.15s, border-color 0.15s;
+    cursor: pointer;
+  }
+  .meiyaku-badge-icon {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #14161c;
+    background: var(--text-dim);
+    overflow: hidden;
+  }
+  .meiyaku-badge-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .meiyaku-badge-body {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+  }
+  .meiyaku-badge-name { font-size: 12px; color: var(--text-dim); }
+  .meiyaku-badge-frac { font-size: 13px; font-weight: 700; color: var(--text); }
+  .meiyaku-badge-frac .sep { color: var(--text-dim); font-weight: 400; margin: 0 1px; }
+
+  /* 未発動: グレーアウト */
+  .meiyaku-badge.state-none {
+    opacity: 0.55;
+  }
+  .meiyaku-badge.state-none .meiyaku-badge-icon { background: #4a4f5c; color: #9aa0b0; }
+
+  /* 発動中: 通常(アクセントカラー) */
+  .meiyaku-badge.state-active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .meiyaku-badge.state-active .meiyaku-badge-icon { background: var(--accent); color: #fff; }
+  .meiyaku-badge.state-active .meiyaku-badge-frac { color: var(--accent); }
+
+  /* 最大: 金枠 */
+  .meiyaku-badge.state-max {
+    border-color: var(--star6);
+    background: rgba(255, 176, 46, 0.15);
+    box-shadow: 0 0 0 1px rgba(255, 176, 46, 0.35);
+  }
+  .meiyaku-badge.state-max .meiyaku-badge-icon { background: var(--star6); color: #2a1c00; }
+  .meiyaku-badge.state-max .meiyaku-badge-frac { color: var(--star6); }
+
+  .hint { font-size: 11px; color: var(--text-dim); margin-top: 8px; }
+
+  /* 盟約説明ポップオーバー */
+  .meiyaku-popover-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+  }
+  .meiyaku-popover {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    max-width: 480px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  }
+  .meiyaku-popover-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--panel);
+  }
+  .meiyaku-popover-title { font-size: 16px; font-weight: 700; color: var(--text); display: block; }
+  .meiyaku-popover-sub { font-size: 12px; color: var(--text-dim); }
+  .meiyaku-popover-body { padding: 10px 16px 16px; }
+  .meiyaku-popover-row {
+    display: flex;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .meiyaku-popover-row:last-child { border-bottom: none; }
+  .meiyaku-popover-cond {
+    flex-shrink: 0;
+    min-width: 64px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .meiyaku-popover-text { color: var(--text); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+  th { color: var(--text-dim); font-weight: 600; font-size: 11px; }
+  .meiyaku-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 1px 7px;
+    border-radius: 6px;
+    font-size: 10px;
+    margin: 1px 2px;
+  }
+  .meiyaku-tag.core { border-color: var(--star6); }
+  .meiyaku-tag.extra { border-color: var(--star3); }
+  .meiyaku-tag.manual {
+    border-color: var(--ok);
+    color: var(--ok);
+    padding-right: 3px;
+  }
+  .kenshu-icon-trigger { cursor: pointer; pointer-events: auto; }
+  .kenshu-diff {
+    background: rgba(255, 107, 107, 0.18);
+    color: var(--danger);
+    font-weight: 700;
+    padding: 0 1px;
+    border-radius: 3px;
+  }
+  .meiyaku-popover-group-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 10px 0 2px;
+  }
+  .meiyaku-popover-group-title:first-child { margin-top: 0; }
+  .manual-remove {
+    background: transparent;
+    border: none;
+    color: var(--ok);
+    cursor: pointer;
+    font-size: 10px;
+    padding: 0 0 0 2px;
+    line-height: 1;
+  }
+  .manual-add-btn {
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 1;
+    padding: 3px 0;
+    border-radius: 999px;
+    cursor: pointer;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+  .manual-add-btn:hover { border-color: var(--ok); color: var(--ok); }
+  select.manual-picker {
+    margin-top: 4px;
+    width: 100%;
+    font-size: 11px;
+    padding: 3px 4px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>堅守協定：盟約2nd オペレータ検索&パーティ編成</h1>
+  <p>グローバル版開催期間: 2026年8月20日（木）17:00 ~ 2026年10月1日（木）3:59</p>
+</header>
+
+<main>
+
+  <!-- スマホ幅では盟約発動カウントのみここに常時固定表示される(PC幅では非表示) -->
+  <div class="mobile-pinned-summary" id="mobilePinnedSummary">
+    <div class="meiyaku-summary" id="meiyakuSummaryMobile">
+      <div class="empty-state" style="padding:6px 0;">キャラを編成すると集計されます。</div>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <!-- 左カラム: 盟約カウント → パーティ編成(PC幅では上部固定) -->
+    <div class="col col-pinned">
+
+      <!-- 盟約カウント -->
+      <section class="meiyaku-section-original">
+        <div class="meiyaku-summary" id="meiyakuSummary">
+          <div class="empty-state" style="padding:10px 0;">キャラを編成すると集計されます。</div>
+        </div>
+      </section>
+
+      <!-- パーティ編成 -->
+      <section>
+        <div class="icon-grid" id="partyDropZone">
+          <div class="empty-state" id="partyEmptyState">ここにキャラをドラッグ、または一覧の＋ボタンでパーティに追加してください</div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- 右カラム: 検索 → オペレータ一覧 -->
+    <div class="col" style="position:relative;z-index:2;">
+
+      <!-- 検索・絞り込み(折りたたみ可能) -->
+      <section>
+        <h2 class="collapsible-header" id="searchSectionToggle">検索・絞り込み<span class="collapse-arrow">▼</span></h2>
+        <div class="collapsible-body" id="searchSectionBody">
+        <div class="filter-row">
+          <span style="font-size:13px;color:var(--text-dim);">盟約・タイミング条件:</span>
+          <div class="mode-toggle" id="modeToggle">
+            <button data-mode="AND" class="active">AND</button>
+            <button data-mode="OR">OR</button>
+            <button data-mode="NOR">NOR</button>
+          </div>
+          <input type="text" id="nameFilter" placeholder="名前で絞り込み">
+        </div>
+        <div class="chip-list" id="meiyakuChipList"></div>
+
+        <div class="chip-list" id="rarityChipList" style="margin-top:14px;margin-bottom:14px;"></div>
+
+        <div class="filter-row" style="margin-bottom:0;">
+          <span class="sub-label" style="margin:0;white-space:nowrap;">堅守特性で絞り込み</span>
+          <select id="categoryFilter">
+            <option value="">分類: すべて</option>
+          </select>
+          <div class="chip-list" id="timingChipList" style="flex:1 1 auto;min-width:0;"></div>
+        </div>
+        </div>
+      </section>
+
+      <!-- 検索結果一覧 -->
+      <section>
+        <h2>オペレータ一覧<span id="resultCountLabel" style="font-weight:400;"></span></h2>
+        <div class="icon-grid" id="resultGrid"></div>
+        <div class="hint">PC: アイコンをドラッグしてパーティ枠へ / スマホ・PC共通: 右上の＋タップでも追加できます</div>
+      </section>
+
+    </div>
+
+  </div>
+</main>
+
+<script src="operators_data.js"></script>
+<script src="meiyaku_thresholds.js"></script>
+<script src="meiyaku_descriptions.js"></script>
+<script>
+/* ==========================================================
+   データ本体は operators_data.js 側の OPERATORS 配列を参照する。
+   このファイルは表示・検索・パーティ編成のロジックのみを持つ。
+
+   OPERATORS の1件のフォーマット(operators_data.js参照):
+   {
+     name, rarity, icon,
+     meiyaku: [{ name, type: "核心"|"追加" }, ...],
+     kenshu: [{ name, category, timing, lv1, lv2 }, ...]
+   }
+   ========================================================== */
+
+let party = []; // OPERATORSのインデックス配列
+let manualMeiyaku = {}; // { idx: ["手動追加した盟約名", ...] } パーティ内でのみ使用
+let currentMode = "AND";
+let selectedChips = new Set();
+let selectedRarities = new Set();
+let selectedTimings = new Set();
+let draggingIdx = null;
+
+// 盟約名 -> 種類(核心/追加) のマップを作る。
+// 同じ名前で種類が食い違うデータがあった場合は先に見つかった方を優先する。
+function getMeiyakuTypeMap() {
+  const map = new Map();
+  OPERATORS.forEach(op => (op.meiyaku || []).forEach(m => {
+    if (m && m.name && !map.has(m.name)) map.set(m.name, m.type || "追加");
+  }));
+  return map;
+}
+
+function getAllMeiyakuNames() {
+  return [...getMeiyakuTypeMap().keys()].sort();
+}
+
+function getAllKenshuCategories() {
+  const set = new Set();
+  OPERATORS.forEach(op => (op.kenshu || []).forEach(k => {
+    if (k && k.category) set.add(k.category);
+  }));
+  return [...set].sort();
+}
+
+function getAllTimings() {
+  const set = new Set();
+  OPERATORS.forEach(op => (op.kenshu || []).forEach(k => {
+    if (k && k.timing) set.add(k.timing);
+  }));
+  return [...set].sort();
+}
+
+function getAllRarities() {
+  const set = new Set();
+  OPERATORS.forEach(op => { if (op.rarity) set.add(op.rarity); });
+  return [...set].sort((a, b) => a - b);
+}
+
+function typeClass(type) {
+  return type === "核心" ? "core" : "extra";
+}
+function typeDotClass(type) {
+  return type === "核心" ? "type-core" : "type-extra";
+}
+
+function rarityClass(r) { return "r" + r; }
+
+function iconInner(op) {
+  if (op.icon) {
+    return `<img src="${op.icon}" alt="${op.name}" draggable="false" onerror="this.parentElement.textContent='${op.name.charAt(0)}'">`;
+  }
+  return op.name.charAt(0);
+}
+
+function renderChips() {
+  const list = document.getElementById('meiyakuChipList');
+  const typeMap = getMeiyakuTypeMap();
+  // 核心盟約グループ → 追加盟約グループの順に並べる。各グループ内は文字コード順。
+  const coreNames = [...typeMap.keys()].filter(m => typeMap.get(m) === "核心").sort();
+  const extraNames = [...typeMap.keys()].filter(m => typeMap.get(m) !== "核心").sort();
+  const all = [...coreNames, ...extraNames];
+  if (all.length === 0) {
+    list.innerHTML = '<span style="color:var(--text-dim);font-size:12px;">盟約データがまだありません</span>';
+    return;
+  }
+  list.innerHTML = all.map(m => {
+    const type = typeMap.get(m);
+    return `<span class="chip${selectedChips.has(m) ? ' selected' : ''}" data-meiyaku="${m}"><span class="chip-type-dot ${typeDotClass(type)}"></span>${m}</span>`;
+  }).join('');
+  list.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const m = chip.dataset.meiyaku;
+      if (selectedChips.has(m)) selectedChips.delete(m);
+      else selectedChips.add(m);
+      renderChips();
+      renderResultGrid();
+    });
+  });
+}
+
+function renderCategoryOptions() {
+  const sel = document.getElementById('categoryFilter');
+  const current = sel.value;
+  const cats = getAllKenshuCategories();
+  sel.innerHTML = '<option value="">分類: すべて</option>' +
+    cats.map(c => `<option value="${c}">${c}</option>`).join('');
+  if (cats.includes(current)) sel.value = current;
+}
+
+function renderRarityChips() {
+  const list = document.getElementById('rarityChipList');
+  const rarities = getAllRarities();
+  if (rarities.length === 0) {
+    list.innerHTML = '<span style="color:var(--text-dim);font-size:12px;">レアリティデータがまだありません</span>';
+    return;
+  }
+  list.innerHTML = rarities.map(r =>
+    `<span class="chip${selectedRarities.has(r) ? ' selected' : ''}" data-rarity="${r}">★${r}</span>`
+  ).join('');
+  list.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const r = parseInt(chip.dataset.rarity, 10);
+      if (selectedRarities.has(r)) selectedRarities.delete(r);
+      else selectedRarities.add(r);
+      renderRarityChips();
+      renderResultGrid();
+    });
+  });
+}
+
+function renderTimingChips() {
+  const list = document.getElementById('timingChipList');
+  const timings = getAllTimings();
+  if (timings.length === 0) {
+    list.innerHTML = '<span style="color:var(--text-dim);font-size:12px;">発動タイミングのデータがまだありません</span>';
+    return;
+  }
+  list.innerHTML = timings.map(t =>
+    `<span class="chip${selectedTimings.has(t) ? ' selected' : ''}" data-timing="${t}">${t}</span>`
+  ).join('');
+  list.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const t = chip.dataset.timing;
+      if (selectedTimings.has(t)) selectedTimings.delete(t);
+      else selectedTimings.add(t);
+      renderTimingChips();
+      renderResultGrid();
+    });
+  });
+}
+
+function getFilteredOperators() {
+  const nameQuery = document.getElementById('nameFilter').value.trim().toLowerCase();
+  const categoryQuery = document.getElementById('categoryFilter').value;
+
+  return OPERATORS
+    .map((op, idx) => ({ op, idx }))
+    .filter(({ op }) => {
+      if (nameQuery && !op.name.toLowerCase().includes(nameQuery)) return false;
+
+      const kenshuList = op.kenshu || [];
+
+      // 盟約チップ + タイミングチップは1つの選択セットとしてAND/OR/NORで判定
+      const selectedSet = new Set([...selectedChips, ...selectedTimings]);
+      if (selectedSet.size > 0) {
+        const opMeiyakuNames = (op.meiyaku || []).filter(Boolean).map(m => m.name);
+        const opTimings = kenshuList.filter(Boolean).map(k => k.timing).filter(Boolean);
+        const opOwnedSet = new Set([...opMeiyakuNames, ...opTimings]);
+
+        if (currentMode === "AND") {
+          if (![...selectedSet].every(v => opOwnedSet.has(v))) return false;
+        } else if (currentMode === "NOR") {
+          if ([...selectedSet].some(v => opOwnedSet.has(v))) return false;
+        } else {
+          if (![...selectedSet].some(v => opOwnedSet.has(v))) return false;
+        }
+      }
+
+      if (selectedRarities.size > 0 && !selectedRarities.has(op.rarity)) return false;
+
+      if (categoryQuery) {
+        if (!kenshuList.some(k => k && k.category === categoryQuery)) return false;
+      }
+
+      return true;
+    });
+}
+
+function makeOpCardHTML(op, idx, inParty) {
+  const tags = (op.meiyaku || []).filter(Boolean).map(m =>
+    `<span class="meiyaku-tag ${typeClass(m.type)}">${m.name}</span>`
+  ).join('');
+
+  let manualTags = '';
+  let manualControls = '';
+  if (inParty) {
+    const manualList = manualMeiyaku[idx] || [];
+    manualTags = manualList.map((name, mi) =>
+      `<span class="meiyaku-tag manual">${name}<button class="manual-remove" data-idx="${idx}" data-mi="${mi}" title="手動追加分を削除">×</button></span>`
+    ).join('');
+    manualControls = `
+      <button class="manual-add-btn" data-idx="${idx}" title="盟約追加">＋</button>
+    `;
+  }
+
+  return `
+    <div class="op-card ${inParty ? 'in-party' : ''}" draggable="true" data-idx="${idx}">
+      <button class="op-tap-add ${inParty ? 'remove' : ''}" data-idx="${idx}" data-action="${inParty ? 'remove' : 'add'}">${inParty ? '×' : '+'}</button>
+      <div class="op-icon ${rarityClass(op.rarity)} kenshu-icon-trigger" data-idx="${idx}">${iconInner(op)}</div>
+      <div class="op-name">${op.name}</div>
+      <div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px;">${tags}${manualTags}${manualControls}</div>
+    </div>
+  `;
+}
+
+function renderResultGrid() {
+  const grid = document.getElementById('resultGrid');
+  const countLabel = document.getElementById('resultCountLabel');
+  const filtered = getFilteredOperators();
+
+  if (OPERATORS.length === 0) {
+    grid.innerHTML = '<div class="empty-state">データが未登録です。operators_data.js にデータを追加すると、ここに一覧が表示されます。</div>';
+    countLabel.textContent = '';
+    return;
+  }
+  countLabel.textContent = `(${filtered.length}件)`;
+  if (filtered.length === 0) {
+    grid.innerHTML = '<div class="empty-state">条件に一致するオペレータがいません。</div>';
+    return;
+  }
+  grid.innerHTML = filtered.map(({ op, idx }) => makeOpCardHTML(op, idx, party.includes(idx))).join('');
+  attachCardEvents(grid);
+}
+
+function renderPartyZone() {
+  const zone = document.getElementById('partyDropZone');
+
+  if (party.length === 0) {
+    zone.innerHTML = '<div class="empty-state" id="partyEmptyState">ここにキャラをドラッグ、または一覧の＋ボタンでパーティに追加してください</div>';
+    return;
+  }
+  zone.innerHTML = party.map(idx => makeOpCardHTML(OPERATORS[idx], idx, true)).join('');
+  attachCardEvents(zone);
+}
+
+function attachCardEvents(container) {
+  container.querySelectorAll('.op-card').forEach(card => {
+    const idx = parseInt(card.dataset.idx, 10);
+    card.addEventListener('dragstart', () => {
+      draggingIdx = idx;
+      card.classList.add('dragging');
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      draggingIdx = null;
+    });
+  });
+  container.querySelectorAll('.op-tap-add').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.idx, 10);
+      if (btn.dataset.action === 'add') {
+        addToParty(idx);
+      } else {
+        removeFromParty(idx);
+      }
+    });
+  });
+  container.querySelectorAll('.manual-add-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openManualAddPicker(btn);
+    });
+  });
+  container.querySelectorAll('.kenshu-icon-trigger').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openKenshuPopover(el);
+    });
+    el.addEventListener('dragstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  });
+  container.querySelectorAll('.manual-remove').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.idx, 10);
+      const mi = parseInt(btn.dataset.mi, 10);
+      manualMeiyaku[idx].splice(mi, 1);
+      renderAll();
+    });
+  });
+}
+
+function openManualAddPicker(btn) {
+  const idx = parseInt(btn.dataset.idx, 10);
+  const names = getAllMeiyakuNames();
+  if (names.length === 0) {
+    alert('選択できる盟約がまだ登録されていません。');
+    return;
+  }
+  // 既存のピッカーがあれば一旦閉じる
+  document.querySelectorAll('.manual-picker').forEach(el => el.remove());
+
+  const picker = document.createElement('select');
+  picker.className = 'manual-picker';
+  picker.innerHTML = `<option value="">盟約を選択…</option>` +
+    names.map(n => `<option value="${n}">${n}</option>`).join('');
+  picker.addEventListener('mousedown', (e) => e.stopPropagation());
+  picker.addEventListener('change', () => {
+    if (picker.value) {
+      if (!manualMeiyaku[idx]) manualMeiyaku[idx] = [];
+      manualMeiyaku[idx].push(picker.value);
+      renderAll();
+    }
+  });
+  btn.replaceWith(picker);
+  picker.focus();
+}
+
+function addToParty(idx) {
+  if (party.includes(idx)) return;
+  party.push(idx);
+  renderAll();
+}
+
+function removeFromParty(idx) {
+  party = party.filter(i => i !== idx);
+  delete manualMeiyaku[idx];
+  renderAll();
+}
+
+function renderMeiyakuSummary() {
+  const targets = [document.getElementById('meiyakuSummary'), document.getElementById('meiyakuSummaryMobile')]
+    .filter(Boolean);
+  if (targets.length === 0) return;
+
+  if (party.length === 0) {
+    const html = '<div class="empty-state" style="padding:10px 0;">キャラを編成すると集計されます。</div>';
+    targets.forEach(el => el.innerHTML = html);
+    return;
+  }
+  // 核心/追加の種類は区別せず、盟約名ごとに単純合算する(手動追加分も含む)
+  const counts = {};
+  party.forEach(idx => {
+    (OPERATORS[idx].meiyaku || []).forEach(m => {
+      if (!m || !m.name) return;
+      counts[m.name] = (counts[m.name] || 0) + 1;
+    });
+    (manualMeiyaku[idx] || []).forEach(name => {
+      counts[name] = (counts[name] || 0) + 1;
+    });
+  });
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  if (entries.length === 0) {
+    const html = '<div class="empty-state" style="padding:10px 0;">編成中のキャラに盟約データがありません。</div>';
+    targets.forEach(el => el.innerHTML = html);
+    return;
+  }
+  const html = entries.map(([name, count]) => {
+    const th = (typeof getMeiyakuThreshold === 'function') ? getMeiyakuThreshold(name) : null;
+    const activate = th ? th.activate : 1;
+    const maxN = th ? th.max : Math.max(activate, count);
+    let state = 'state-none';
+    if (th && th.exact) {
+      if (count === activate) state = 'state-max';
+    } else {
+      if (count >= maxN) state = 'state-max';
+      else if (count >= activate) state = 'state-active';
+    }
+    const fallback = name.slice(0, 1); // 画像読み込み失敗時は頭文字で代用
+    const iconPath = (typeof getMeiyakuIconPath === 'function') ? getMeiyakuIconPath(name) : null;
+    const iconInner = iconPath
+      ? `<img src="${iconPath}" alt="${name}" onerror="this.parentElement.textContent='${fallback}'">`
+      : fallback;
+    return `
+    <div class="meiyaku-badge ${state}" data-meiyaku="${name}" data-activate="${activate}" data-max="${maxN}" data-count="${count}" title="${name}：発動${activate}名/最大${maxN}名">
+      <div class="meiyaku-badge-icon">${iconInner}</div>
+      <div class="meiyaku-badge-body">
+        <span class="meiyaku-badge-name">${name}</span>
+        <span class="meiyaku-badge-frac">${count}<span class="sep">/</span>${maxN}</span>
+      </div>
+    </div>`;
+  }).join('');
+  targets.forEach(el => {
+    el.innerHTML = html;
+    el.querySelectorAll('.meiyaku-badge').forEach(badge => {
+      badge.addEventListener('click', () => openMeiyakuPopover(badge));
+    });
+  });
+}
+
+// ── 盟約説明ポップオーバー ──
+function openMeiyakuPopover(badge) {
+  const name = badge.dataset.meiyaku;
+  const activate = badge.dataset.activate;
+  const maxN = badge.dataset.max;
+  const count = badge.dataset.count;
+  const desc = (typeof getMeiyakuDescription === 'function') ? getMeiyakuDescription(name) : null;
+
+  let bodyHtml;
+  if (desc && desc.effects && desc.effects.length) {
+    bodyHtml = desc.effects.map(e =>
+      `<div class="meiyaku-popover-row"><span class="meiyaku-popover-cond">${e.cond}</span><span class="meiyaku-popover-text">${e.text}</span></div>`
+    ).join('');
+  } else {
+    bodyHtml = '<div class="meiyaku-popover-row"><span class="meiyaku-popover-text">説明データ未登録</span></div>';
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'meiyaku-popover-overlay';
+  overlay.innerHTML = `
+    <div class="meiyaku-popover">
+      <div class="meiyaku-popover-header">
+        <span class="meiyaku-popover-title">${name}</span>
+        <span class="meiyaku-popover-sub">現在 ${count} / 発動${activate}名 / 最大${maxN}名</span>
+      </div>
+      <div class="meiyaku-popover-body">${bodyHtml}</div>
+    </div>`;
+  overlay.addEventListener('click', (ev) => {
+    if (ev.target === overlay) overlay.remove();
+  });
+  overlay.querySelector('.meiyaku-popover').addEventListener('click', (ev) => ev.stopPropagation());
+  document.body.appendChild(overlay);
+}
+
+// ── 差分ハイライト(数値や語句をひとまとまりのトークンとして比較) ──
+function escHtml(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+// テキストを「数値(小数含む)」と「それ以外の1文字」のトークン列に分割する
+function tokenize(text) {
+  const s = text || '';
+  const re = /\d+(?:\.\d+)?/g;
+  const tokens = [];
+  let last = 0;
+  let m;
+  while ((m = re.exec(s)) !== null) {
+    if (m.index > last) {
+      for (const ch of s.slice(last, m.index)) tokens.push(ch);
+    }
+    tokens.push(m[0]);
+    last = m.index + m[0].length;
+  }
+  if (last < s.length) {
+    for (const ch of s.slice(last)) tokens.push(ch);
+  }
+  return tokens;
+}
+// baseText(Lv1) と targetText(Lv2) をトークン単位で比較し、targetText側で
+// baseTextに存在しない(=変化した)トークンを <mark> で囲んで返す。
+function highlightDiff(baseText, targetText) {
+  const a = tokenize(baseText);
+  const b = tokenize(targetText);
+  const n = a.length, m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  const bIsCommon = new Array(m).fill(false);
+  let i = n, j = m;
+  while (i > 0 && j > 0) {
+    if (a[i - 1] === b[j - 1]) {
+      bIsCommon[j - 1] = true;
+      i--; j--;
+    } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+      i--;
+    } else {
+      j--;
+    }
+  }
+  let html = '';
+  let k = 0;
+  while (k < m) {
+    if (bIsCommon[k]) {
+      html += escHtml(b[k]);
+      k++;
+    } else {
+      let start = k;
+      while (k < m && !bIsCommon[k]) k++;
+      html += `<mark class="kenshu-diff">${escHtml(b.slice(start, k).join(''))}</mark>`;
+    }
+  }
+  return html;
+}
+
+// ── 堅守特性説明ポップオーバー ──
+function openKenshuPopover(el) {
+  const idx = parseInt(el.dataset.idx, 10);
+  const op = OPERATORS[idx];
+  const kenshuList = (op.kenshu || []).filter(Boolean);
+
+  if (kenshuList.length === 0) {
+    return;
+  }
+
+  // name単位でグループ化（分割で同名複数timingになっているものをまとめる）
+  const groups = [];
+  const groupMap = new Map();
+  kenshuList.forEach(k => {
+    if (!groupMap.has(k.name)) {
+      const g = { name: k.name, items: [] };
+      groupMap.set(k.name, g);
+      groups.push(g);
+    }
+    groupMap.get(k.name).items.push(k);
+  });
+
+  const bodyHtml = groups.map(g => {
+    const k = g.items[0]; // 同名は複数timingに分割されている場合があるが表示は1回でよい
+    const lv1Html = k.lv1 ? escHtml(k.lv1) : '-';
+    const lv2Html = k.lv2 ? highlightDiff(k.lv1 || '', k.lv2) : '-';
+    return `
+      <div class="meiyaku-popover-row">
+        <span class="meiyaku-popover-text">Lv1: ${lv1Html}</span>
+      </div>
+      <div class="meiyaku-popover-row">
+        <span class="meiyaku-popover-text">Lv2: ${lv2Html}</span>
+      </div>
+    `;
+  }).join('');
+
+  const category = kenshuList[0].category || '';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'meiyaku-popover-overlay';
+  overlay.innerHTML = `
+    <div class="meiyaku-popover">
+      <div class="meiyaku-popover-header">
+        <span class="meiyaku-popover-title">${op.name}</span>
+        <span class="meiyaku-popover-sub">${category}</span>
+      </div>
+      <div class="meiyaku-popover-body">${bodyHtml}</div>
+    </div>`;
+  overlay.addEventListener('click', (ev) => {
+    if (ev.target === overlay) overlay.remove();
+  });
+  overlay.querySelector('.meiyaku-popover').addEventListener('click', (ev) => ev.stopPropagation());
+  document.body.appendChild(overlay);
+}
+
+// 検索・絞り込みセクションの折りたたみ制御
+function setupCollapsible() {
+  const header = document.getElementById('searchSectionToggle');
+  const body = document.getElementById('searchSectionBody');
+  if (!header || !body) return;
+  header.addEventListener('click', () => {
+    header.classList.toggle('collapsed');
+    body.classList.toggle('collapsed');
+  });
+}
+
+function renderAll() {
+  renderChips();
+  renderRarityChips();
+  renderTimingChips();
+  renderCategoryOptions();
+  renderResultGrid();
+  renderPartyZone();
+  renderMeiyakuSummary();
+  setupDropZone();
+}
+
+function setupDropZone() {
+  const zone = document.getElementById('partyDropZone');
+  zone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    zone.classList.add('drag-over');
+  });
+  zone.addEventListener('dragleave', () => {
+    zone.classList.remove('drag-over');
+  });
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    if (draggingIdx !== null) {
+      addToParty(draggingIdx);
+    }
+  });
+}
+
+document.querySelectorAll('#modeToggle button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#modeToggle button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+    renderResultGrid();
+  });
+});
+
+document.getElementById('nameFilter').addEventListener('input', renderResultGrid);
+document.getElementById('categoryFilter').addEventListener('change', renderResultGrid);
+
+setupCollapsible();
+renderAll();
+</script>
+
+</body>
+</html>
